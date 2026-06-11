@@ -1,0 +1,1160 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Viv Scanner - Firmware Security Analysis Platform API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication
+  - name: firmware
+    description: Firmware management
+  - name: scanner
+    description: Scan operations
+  - name: security
+    description: Security analysis
+  - name: cve
+    description: CVE intelligence
+  - name: malware
+    description: Malware detection
+  - name: qemu
+    description: QEMU emulation
+  - name: reports
+    description: Reports and history
+  - name: dashboard
+    description: Dashboard summary
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /auth/register:
+    post:
+      operationId: registerUser
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserRegisterInput"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Bad request
+
+  /auth/login:
+    post:
+      operationId: loginUser
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserLoginInput"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Unauthorized
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /firmware:
+    get:
+      operationId: listFirmware
+      tags: [firmware]
+      summary: List all firmware uploads
+      responses:
+        "200":
+          description: List of firmware
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Firmware"
+
+    post:
+      operationId: uploadFirmware
+      tags: [firmware]
+      summary: Upload firmware file
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FirmwareInput"
+      responses:
+        "201":
+          description: Firmware uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Firmware"
+
+  /firmware/{id}:
+    get:
+      operationId: getFirmware
+      tags: [firmware]
+      summary: Get firmware details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Firmware details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Firmware"
+        "404":
+          description: Not found
+
+    delete:
+      operationId: deleteFirmware
+      tags: [firmware]
+      summary: Delete firmware
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /scanner/start:
+    post:
+      operationId: startScan
+      tags: [scanner]
+      summary: Start a firmware scan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScanStartInput"
+      responses:
+        "201":
+          description: Scan started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanResult"
+
+  /scanner/results/{firmwareId}:
+    get:
+      operationId: getScanResults
+      tags: [scanner]
+      summary: Get scan results for firmware
+      parameters:
+        - name: firmwareId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Scan results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScanResult"
+
+  /scanner/files/{firmwareId}:
+    get:
+      operationId: getExtractedFiles
+      tags: [scanner]
+      summary: Get extracted files from firmware
+      parameters:
+        - name: firmwareId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Extracted file list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ExtractedFile"
+
+  /scanner/binary/{firmwareId}:
+    post:
+      operationId: runBinaryAnalysis
+      tags: [scanner]
+      summary: Run binary analysis on extracted binaries
+      parameters:
+        - name: firmwareId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BinaryAnalysisInput"
+      responses:
+        "200":
+          description: Binary analysis results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BinaryAnalysisResult"
+
+  /security/vulnerabilities/{firmwareId}:
+    get:
+      operationId: getVulnerabilities
+      tags: [security]
+      summary: Get vulnerabilities for firmware
+      parameters:
+        - name: firmwareId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Vulnerability list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Vulnerability"
+
+  /security/score/{firmwareId}:
+    get:
+      operationId: getSecurityScore
+      tags: [security]
+      summary: Get security score for firmware
+      parameters:
+        - name: firmwareId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Security score
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecurityScore"
+
+  /security/secrets/{firmwareId}:
+    get:
+      operationId: getHardcodedSecrets
+      tags: [security]
+      summary: Get hardcoded secrets found in firmware
+      parameters:
+        - name: firmwareId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Secrets list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HardcodedSecret"
+
+  /security/dangerous-functions/{firmwareId}:
+    get:
+      operationId: getDangerousFunctions
+      tags: [security]
+      summary: Get dangerous function calls found in firmware
+      parameters:
+        - name: firmwareId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Dangerous function list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DangerousFunction"
+
+  /cve/matches/{firmwareId}:
+    get:
+      operationId: getCveMatches
+      tags: [cve]
+      summary: Get CVE matches for firmware
+      parameters:
+        - name: firmwareId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: CVE match list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CveMatch"
+
+  /cve/scores/{firmwareId}:
+    get:
+      operationId: getCvssScores
+      tags: [cve]
+      summary: Get CVSS scores breakdown for firmware
+      parameters:
+        - name: firmwareId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: CVSS score breakdown
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CvssBreakdown"
+
+  /malware/hash:
+    post:
+      operationId: analyzeHash
+      tags: [malware]
+      summary: Analyze a file hash against VirusTotal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HashAnalysisInput"
+      responses:
+        "200":
+          description: Hash analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MalwareHash"
+
+  /malware/threat-score/{firmwareId}:
+    get:
+      operationId: getThreatScore
+      tags: [malware]
+      summary: Get threat score for firmware
+      parameters:
+        - name: firmwareId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Threat score
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ThreatScore"
+
+  /malware/virustotal/{firmwareId}:
+    get:
+      operationId: getVirusTotalResults
+      tags: [malware]
+      summary: Get VirusTotal scan results for firmware files
+      parameters:
+        - name: firmwareId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: VirusTotal results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MalwareHash"
+
+  /qemu/start:
+    post:
+      operationId: startEmulation
+      tags: [qemu]
+      summary: Start QEMU emulation of firmware
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmulationInput"
+      responses:
+        "201":
+          description: Emulation started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmulationLog"
+
+  /qemu/services/{firmwareId}:
+    get:
+      operationId: getRunningServices
+      tags: [qemu]
+      summary: Get running services from emulation
+      parameters:
+        - name: firmwareId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Running services
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmulationLog"
+
+  /qemu/ports/{firmwareId}:
+    get:
+      operationId: getOpenPorts
+      tags: [qemu]
+      summary: Get open ports detected during emulation
+      parameters:
+        - name: firmwareId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Open ports
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenPortList"
+
+  /reports/pdf/{firmwareId}:
+    get:
+      operationId: getPdfReport
+      tags: [reports]
+      summary: Get PDF report for a firmware scan
+      parameters:
+        - name: firmwareId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: PDF report info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportMeta"
+
+  /reports/ai-summary/{firmwareId}:
+    get:
+      operationId: getAiSummary
+      tags: [reports]
+      summary: Get AI-generated summary and risk analysis
+      parameters:
+        - name: firmwareId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: AI summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiReport"
+
+  /reports/history:
+    get:
+      operationId: getScanHistory
+      tags: [reports]
+      summary: Get full scan history
+      responses:
+        "200":
+          description: Scan history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScanHistoryEntry"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard overview summary
+      responses:
+        "200":
+          description: Dashboard summary stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/activity:
+    get:
+      operationId: getRecentActivity
+      tags: [dashboard]
+      summary: Get recent scan activity feed
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityEntry"
+
+  /dashboard/risk-distribution:
+    get:
+      operationId: getRiskDistribution
+      tags: [dashboard]
+      summary: Get vulnerability risk level distribution for charts
+      responses:
+        "200":
+          description: Risk distribution data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiskDistribution"
+
+  /dashboard/threat-trend:
+    get:
+      operationId: getThreatTrend
+      tags: [dashboard]
+      summary: Get threat score trend over time for graphs
+      responses:
+        "200":
+          description: Threat trend data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ThreatTrendPoint"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+
+    User:
+      type: object
+      required: [id, username, email, role, createdAt]
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [admin, analyst, viewer]
+        createdAt:
+          type: string
+
+    UserRegisterInput:
+      type: object
+      required: [username, email, password]
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+
+    UserLoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+
+    Firmware:
+      type: object
+      required: [id, name, uploadedAt, architecture, hashValue, status, fileSize]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        uploadedAt:
+          type: string
+        architecture:
+          type: string
+          enum: [ARM, MIPS, x86, x86_64, UNKNOWN]
+        hashValue:
+          type: string
+        status:
+          type: string
+          enum: [pending, scanning, completed, failed]
+        fileSize:
+          type: integer
+        vendor:
+          type: ["string", "null"]
+        version:
+          type: ["string", "null"]
+
+    FirmwareInput:
+      type: object
+      required: [name, hashValue, fileSize]
+      properties:
+        name:
+          type: string
+        hashValue:
+          type: string
+        fileSize:
+          type: integer
+        architecture:
+          type: string
+        vendor:
+          type: string
+        version:
+          type: string
+
+    ScanResult:
+      type: object
+      required: [id, firmwareId, startedAt, status, progress]
+      properties:
+        id:
+          type: integer
+        firmwareId:
+          type: integer
+        startedAt:
+          type: string
+        completedAt:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [running, completed, failed]
+        progress:
+          type: integer
+        totalFiles:
+          type: ["integer", "null"]
+        vulnerabilitiesFound:
+          type: ["integer", "null"]
+        riskLevel:
+          type: ["string", "null"]
+          enum: [critical, high, medium, low, null]
+
+    ScanStartInput:
+      type: object
+      required: [firmwareId]
+      properties:
+        firmwareId:
+          type: integer
+        deepScan:
+          type: boolean
+
+    ExtractedFile:
+      type: object
+      required: [id, firmwareId, path, type, size]
+      properties:
+        id:
+          type: integer
+        firmwareId:
+          type: integer
+        path:
+          type: string
+        type:
+          type: string
+        size:
+          type: integer
+        permissions:
+          type: ["string", "null"]
+        isSuspicious:
+          type: boolean
+
+    BinaryAnalysisInput:
+      type: object
+      required: [filePath]
+      properties:
+        filePath:
+          type: string
+
+    BinaryAnalysisResult:
+      type: object
+      required: [firmwareId, filePath, strings, urls, credentials, debugPaths]
+      properties:
+        firmwareId:
+          type: integer
+        filePath:
+          type: string
+        strings:
+          type: array
+          items:
+            type: string
+        urls:
+          type: array
+          items:
+            type: string
+        credentials:
+          type: array
+          items:
+            type: string
+        debugPaths:
+          type: array
+          items:
+            type: string
+
+    Vulnerability:
+      type: object
+      required: [id, firmwareId, type, severity, affectedFile, description, recommendation]
+      properties:
+        id:
+          type: integer
+        firmwareId:
+          type: integer
+        type:
+          type: string
+        severity:
+          type: string
+          enum: [critical, high, medium, low, info]
+        affectedFile:
+          type: string
+        description:
+          type: string
+        recommendation:
+          type: string
+        cvssScore:
+          type: ["number", "null"]
+        discoveredAt:
+          type: string
+
+    SecurityScore:
+      type: object
+      required: [firmwareId, overallScore, riskLevel, criticalCount, highCount, mediumCount, lowCount]
+      properties:
+        firmwareId:
+          type: integer
+        overallScore:
+          type: integer
+        riskLevel:
+          type: string
+          enum: [critical, high, medium, low]
+        criticalCount:
+          type: integer
+        highCount:
+          type: integer
+        mediumCount:
+          type: integer
+        lowCount:
+          type: integer
+        hardcodedSecretsCount:
+          type: integer
+        dangerousFunctionsCount:
+          type: integer
+
+    HardcodedSecret:
+      type: object
+      required: [id, firmwareId, type, value, file, line]
+      properties:
+        id:
+          type: integer
+        firmwareId:
+          type: integer
+        type:
+          type: string
+          enum: [password, api_key, token, private_key, certificate]
+        value:
+          type: string
+        file:
+          type: string
+        line:
+          type: integer
+        severity:
+          type: string
+          enum: [critical, high, medium, low]
+
+    DangerousFunction:
+      type: object
+      required: [id, firmwareId, name, file, line, risk]
+      properties:
+        id:
+          type: integer
+        firmwareId:
+          type: integer
+        name:
+          type: string
+        file:
+          type: string
+        line:
+          type: integer
+        risk:
+          type: string
+          enum: [critical, high, medium]
+        description:
+          type: string
+
+    CveMatch:
+      type: object
+      required: [id, firmwareId, cveId, severity, cvssScore, description, affectedComponent]
+      properties:
+        id:
+          type: integer
+        firmwareId:
+          type: integer
+        cveId:
+          type: string
+        severity:
+          type: string
+          enum: [critical, high, medium, low]
+        cvssScore:
+          type: number
+        description:
+          type: string
+        affectedComponent:
+          type: string
+        publishedDate:
+          type: string
+        patchAvailable:
+          type: boolean
+
+    CvssBreakdown:
+      type: object
+      required: [firmwareId, critical, high, medium, low, averageScore]
+      properties:
+        firmwareId:
+          type: integer
+        critical:
+          type: integer
+        high:
+          type: integer
+        medium:
+          type: integer
+        low:
+          type: integer
+        averageScore:
+          type: number
+
+    MalwareHash:
+      type: object
+      required: [id, firmwareId, sha256, threatScore, virusTotalResult, isMalicious]
+      properties:
+        id:
+          type: integer
+        firmwareId:
+          type: integer
+        sha256:
+          type: string
+        threatScore:
+          type: integer
+        virusTotalResult:
+          type: string
+          enum: [clean, malicious, suspicious, unknown]
+        isMalicious:
+          type: boolean
+        detectionCount:
+          type: integer
+        totalEngines:
+          type: integer
+        fileName:
+          type: ["string", "null"]
+
+    HashAnalysisInput:
+      type: object
+      required: [sha256, firmwareId]
+      properties:
+        sha256:
+          type: string
+        firmwareId:
+          type: integer
+        fileName:
+          type: string
+
+    ThreatScore:
+      type: object
+      required: [firmwareId, score, level, maliciousFiles, suspiciousFiles, cleanFiles]
+      properties:
+        firmwareId:
+          type: integer
+        score:
+          type: integer
+        level:
+          type: string
+          enum: [critical, high, medium, low]
+        maliciousFiles:
+          type: integer
+        suspiciousFiles:
+          type: integer
+        cleanFiles:
+          type: integer
+
+    EmulationLog:
+      type: object
+      required: [id, firmwareId, status, architecture, startedAt]
+      properties:
+        id:
+          type: integer
+        firmwareId:
+          type: integer
+        status:
+          type: string
+          enum: [starting, running, stopped, failed]
+        architecture:
+          type: string
+        startedAt:
+          type: string
+        stoppedAt:
+          type: ["string", "null"]
+        runningServices:
+          type: array
+          items:
+            type: string
+        openPorts:
+          type: array
+          items:
+            type: integer
+        runtimeLogs:
+          type: ["string", "null"]
+
+    EmulationInput:
+      type: object
+      required: [firmwareId]
+      properties:
+        firmwareId:
+          type: integer
+        architecture:
+          type: string
+
+    OpenPortList:
+      type: object
+      required: [firmwareId, ports]
+      properties:
+        firmwareId:
+          type: integer
+        ports:
+          type: array
+          items:
+            $ref: "#/components/schemas/PortInfo"
+
+    PortInfo:
+      type: object
+      required: [port, protocol, service]
+      properties:
+        port:
+          type: integer
+        protocol:
+          type: string
+        service:
+          type: string
+        state:
+          type: string
+
+    ReportMeta:
+      type: object
+      required: [firmwareId, generatedAt, downloadUrl, fileSize]
+      properties:
+        firmwareId:
+          type: integer
+        generatedAt:
+          type: string
+        downloadUrl:
+          type: string
+        fileSize:
+          type: integer
+        scanId:
+          type: ["integer", "null"]
+
+    AiReport:
+      type: object
+      required: [firmwareId, summary, riskLevel, keyFindings, recommendations, generatedAt]
+      properties:
+        firmwareId:
+          type: integer
+        summary:
+          type: string
+        riskLevel:
+          type: string
+          enum: [critical, high, medium, low]
+        keyFindings:
+          type: array
+          items:
+            type: string
+        recommendations:
+          type: array
+          items:
+            type: string
+        generatedAt:
+          type: string
+        exploitProbability:
+          type: ["number", "null"]
+
+    ScanHistoryEntry:
+      type: object
+      required: [id, firmwareName, scannedAt, status, riskLevel, vulnerabilitiesFound, firmwareId]
+      properties:
+        id:
+          type: integer
+        firmwareId:
+          type: integer
+        firmwareName:
+          type: string
+        scannedAt:
+          type: string
+        status:
+          type: string
+          enum: [completed, failed, running]
+        riskLevel:
+          type: string
+          enum: [critical, high, medium, low]
+        vulnerabilitiesFound:
+          type: integer
+        threatScore:
+          type: ["integer", "null"]
+
+    DashboardSummary:
+      type: object
+      required: [totalFirmware, totalScans, criticalVulnerabilities, highVulnerabilities, averageThreatScore, activeScan, recentScans]
+      properties:
+        totalFirmware:
+          type: integer
+        totalScans:
+          type: integer
+        criticalVulnerabilities:
+          type: integer
+        highVulnerabilities:
+          type: integer
+        averageThreatScore:
+          type: integer
+        activeScan:
+          type: boolean
+        recentScans:
+          type: integer
+        maliciousFiles:
+          type: integer
+        cveMatches:
+          type: integer
+
+    ActivityEntry:
+      type: object
+      required: [id, type, message, timestamp, severity]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [scan_started, scan_completed, vulnerability_found, malware_detected, cve_matched, emulation_started]
+        message:
+          type: string
+        timestamp:
+          type: string
+        severity:
+          type: string
+          enum: [critical, high, medium, low, info]
+        firmwareId:
+          type: ["integer", "null"]
+        firmwareName:
+          type: ["string", "null"]
+
+    RiskDistribution:
+      type: object
+      required: [critical, high, medium, low, total]
+      properties:
+        critical:
+          type: integer
+        high:
+          type: integer
+        medium:
+          type: integer
+        low:
+          type: integer
+        total:
+          type: integer
+
+    ThreatTrendPoint:
+      type: object
+      required: [date, score, firmwareCount]
+      properties:
+        date:
+          type: string
+        score:
+          type: integer
+        firmwareCount:
+          type: integer
