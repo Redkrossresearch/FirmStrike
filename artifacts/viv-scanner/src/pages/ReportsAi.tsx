@@ -2,6 +2,7 @@ import { useParams, Link } from "wouter";
 import { 
   useGetAiSummary, getGetAiSummaryQueryKey,
   useGetPdfReport, getGetPdfReportQueryKey,
+  useGetSbomReport, getGetSbomReportQueryKey,
   useGetScanHistory, getGetScanHistoryQueryKey
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +12,26 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { FileText, ChevronLeft, Brain, Download, History, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+
+interface SbomComponent {
+  name: string;
+  version: string;
+  type: string;
+  path: string;
+  source: string;
+}
+
+interface SbomReport {
+  firmwareId: number;
+  generatedAt: string;
+  componentCount: number;
+  downloadUrls: {
+    cyclonedx: string;
+    spdx: string;
+    csv: string;
+  };
+  components: SbomComponent[];
+}
 
 export default function ReportsAi() {
   const params = useParams();
@@ -22,6 +43,10 @@ export default function ReportsAi() {
 
   const { data: pdfMeta, isLoading: loadingPdf } = useGetPdfReport(firmwareId, {
     query: { enabled: !!firmwareId, queryKey: getGetPdfReportQueryKey(firmwareId) }
+  });
+
+  const { data: sbomMeta, isLoading: loadingSbom } = useGetSbomReport(firmwareId, {
+    query: { enabled: !!firmwareId, queryKey: getGetSbomReportQueryKey(firmwareId) }
   });
 
   const { data: history, isLoading: loadingHistory } = useGetScanHistory({
@@ -64,14 +89,24 @@ export default function ReportsAi() {
             INTELLIGENCE_REPORTS
           </motion.h1>
         </div>
-        <Button 
-          variant="outline" 
-          className="font-mono text-xs border-primary/50 text-primary hover:bg-primary/20 transition-all"
-          onClick={handleDownload}
-          disabled={loadingPdf || !pdfMeta}
-        >
-          <Download className="w-4 h-4 mr-2" /> Download PDF Report
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            className="font-mono text-xs border-primary/50 text-primary hover:bg-primary/20 transition-all"
+            onClick={handleDownload}
+            disabled={loadingPdf || !pdfMeta}
+          >
+            <Download className="w-4 h-4 mr-2" /> Download PDF Report
+          </Button>
+          <Button 
+            variant="outline" 
+            className="font-mono text-xs border-primary/50 text-primary hover:bg-primary/20 transition-all"
+            onClick={() => sbomMeta?.downloadUrls && window.open(sbomMeta.downloadUrls.csv, '_blank')}
+            disabled={loadingSbom || !sbomMeta}
+          >
+            <Download className="w-4 h-4 mr-2" /> Download SBOM CSV
+          </Button>
+        </div>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
@@ -96,7 +131,6 @@ export default function ReportsAi() {
                 <div className="bg-muted/10 p-4 rounded-md border border-border/50 font-sans text-sm leading-relaxed text-foreground">
                   {aiReport.summary}
                 </div>
-                
                 <div className="grid md:grid-cols-2 gap-6">
                   <div>
                     <h4 className="font-mono text-xs uppercase text-muted-foreground mb-3">Key Findings</h4>
@@ -123,39 +157,50 @@ export default function ReportsAi() {
                 </div>
               </div>
             ) : (
-               <p className="text-muted-foreground font-mono">AI Analysis unavailable.</p>
+              <p className="text-muted-foreground font-mono">AI Analysis unavailable.</p>
             )}
           </CardContent>
         </Card>
 
         <Card className="border-border bg-card/80 backdrop-blur-md shadow-lg md:col-span-1">
           <CardHeader>
-            <CardTitle className="font-mono text-sm uppercase text-primary border-b border-border/50 pb-2">Risk Probability</CardTitle>
+            <CardTitle className="font-mono text-sm uppercase text-primary border-b border-border/50 pb-2 flex items-center gap-2">
+              <Download className="w-4 h-4" /> SBOM Summary
+            </CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col items-center justify-center p-8">
-            {loadingAi ? (
-              <Skeleton className="h-32 w-32 rounded-full" />
-            ) : aiReport ? (
-              <>
-                <div className="relative flex items-center justify-center mb-6">
-                  <svg className="w-32 h-32 transform -rotate-90">
-                     <circle cx="64" cy="64" r="50" stroke="hsl(var(--muted))" strokeWidth="8" fill="none" />
-                     <circle cx="64" cy="64" r="50" stroke="hsl(var(--destructive))" strokeWidth="8" fill="none" 
-                             strokeDasharray={314} strokeDashoffset={314 - ((aiReport.exploitProbability || 0) / 100) * 314} 
-                             strokeLinecap="round" />
-                  </svg>
-                  <div className="absolute text-3xl font-bold font-mono text-destructive drop-shadow-[0_0_8px_rgba(255,0,0,0.5)]">
-                    {aiReport.exploitProbability}%
-                  </div>
+          <CardContent className="p-4">
+            {loadingSbom ? (
+              <div className="space-y-3">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+            ) : sbomMeta ? (
+              <div className="space-y-4 text-sm text-foreground">
+                <div className="font-mono text-xs uppercase text-muted-foreground">Generated</div>
+                <div>{new Date(sbomMeta.generatedAt).toLocaleString()}</div>
+                <div className="font-mono text-xs uppercase text-muted-foreground">Component Count</div>
+                <div className="text-2xl font-bold font-mono text-primary">{sbomMeta.componentCount}</div>
+                <div className="grid gap-2">
+                  <Button
+                    variant="secondary"
+                    className="font-mono text-xs"
+                    onClick={() => window.open(sbomMeta.downloadUrls.cyclonedx, '_blank')}
+                  >
+                    Download CycloneDX JSON
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    className="font-mono text-xs"
+                    onClick={() => window.open(sbomMeta.downloadUrls.spdx, '_blank')}
+                  >
+                    Download SPDX JSON
+                  </Button>
                 </div>
-                <div className="text-center">
-                  <p className="font-mono text-xs uppercase text-muted-foreground">Exploit Likelihood</p>
-                  <Badge variant="outline" className={`mt-2 uppercase font-mono ${aiReport.riskLevel === 'critical' ? 'bg-destructive/10 text-destructive border-destructive/30' : 'bg-primary/10 text-primary border-primary/30'}`}>
-                    {aiReport.riskLevel} RISK
-                  </Badge>
-                </div>
-              </>
-            ) : null}
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground font-mono">SBOM metadata unavailable. Ensure scan completed.</div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -169,7 +214,7 @@ export default function ReportsAi() {
         <CardContent className="p-0">
           {loadingHistory ? (
              <div className="p-6 space-y-2">
-               {[1,2,3].map(i => <Skeleton key={i} className="h-10 w-full bg-muted/20" />)}
+               {[1,2,3].map((i) => <Skeleton key={i} className="h-10 w-full bg-muted/20" />)}
              </div>
           ) : history && history.length > 0 ? (
              <Table>
