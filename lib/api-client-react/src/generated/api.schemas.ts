@@ -399,6 +399,28 @@ export interface AiReport {
   exploitProbability?: number | null;
 }
 
+export interface SbomComponent {
+  name: string;
+  version: string;
+  type: string;
+  path: string;
+  source: string;
+}
+
+export type SbomReportDownloadUrls = {
+  cyclonedx: string;
+  spdx: string;
+  csv: string;
+};
+
+export interface SbomReport {
+  firmwareId: number;
+  generatedAt: string;
+  componentCount: number;
+  downloadUrls: SbomReportDownloadUrls;
+  components: SbomComponent[];
+}
+
 export type ScanHistoryEntryStatus = typeof ScanHistoryEntryStatus[keyof typeof ScanHistoryEntryStatus];
 
 

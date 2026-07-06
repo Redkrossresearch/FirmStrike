@@ -8,6 +8,7 @@ import { matchCvesForComponents } from "./cve.js";
 import { scanExtractedBinaries } from "./malware-analyzer.js";
 import { runEmulation } from "./emulation.js";
 import { generateAiReport } from "./ollama.js";
+import { generateSbomReport } from "./sbom-generator.js";
 
 function computeRiskLevel(
   vulnCount: number,
@@ -106,6 +107,8 @@ export async function runScanPipeline(firmwareId: number, scanId: number): Promi
     });
 
     await db.update(scanResultsTable).set({ progress: 85 }).where(eq(scanResultsTable.id, scanId));
+
+    await generateSbomReport(firmwareId, extractPath);
 
     const aiReport = await generateAiReport({
       firmwareName: fw.name,

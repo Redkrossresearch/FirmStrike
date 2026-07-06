@@ -1116,6 +1116,98 @@ export declare const GetAiSummaryResponse: zod.ZodObject<{
     exploitProbability?: number | null | undefined;
 }>;
 /**
+ * @summary Get SBOM metadata and component list for a firmware scan
+ */
+export declare const GetSbomReportParams: zod.ZodObject<{
+    firmwareId: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    firmwareId: number;
+}, {
+    firmwareId: number;
+}>;
+export declare const GetSbomReportResponse: zod.ZodObject<{
+    firmwareId: zod.ZodNumber;
+    generatedAt: zod.ZodString;
+    componentCount: zod.ZodNumber;
+    downloadUrls: zod.ZodObject<{
+        cyclonedx: zod.ZodString;
+        spdx: zod.ZodString;
+        csv: zod.ZodString;
+    }, "strip", zod.ZodTypeAny, {
+        cyclonedx: string;
+        spdx: string;
+        csv: string;
+    }, {
+        cyclonedx: string;
+        spdx: string;
+        csv: string;
+    }>;
+    components: zod.ZodArray<zod.ZodObject<{
+        name: zod.ZodString;
+        version: zod.ZodString;
+        type: zod.ZodString;
+        path: zod.ZodString;
+        source: zod.ZodString;
+    }, "strip", zod.ZodTypeAny, {
+        path: string;
+        type: string;
+        name: string;
+        version: string;
+        source: string;
+    }, {
+        path: string;
+        type: string;
+        name: string;
+        version: string;
+        source: string;
+    }>, "many">;
+}, "strip", zod.ZodTypeAny, {
+    firmwareId: number;
+    generatedAt: string;
+    componentCount: number;
+    downloadUrls: {
+        cyclonedx: string;
+        spdx: string;
+        csv: string;
+    };
+    components: {
+        path: string;
+        type: string;
+        name: string;
+        version: string;
+        source: string;
+    }[];
+}, {
+    firmwareId: number;
+    generatedAt: string;
+    componentCount: number;
+    downloadUrls: {
+        cyclonedx: string;
+        spdx: string;
+        csv: string;
+    };
+    components: {
+        path: string;
+        type: string;
+        name: string;
+        version: string;
+        source: string;
+    }[];
+}>;
+/**
+ * @summary Download SBOM file in the requested format
+ */
+export declare const GetSbomDownloadParams: zod.ZodObject<{
+    firmwareId: zod.ZodNumber;
+    format: zod.ZodEnum<["cyclonedx", "spdx", "csv"]>;
+}, "strip", zod.ZodTypeAny, {
+    firmwareId: number;
+    format: "cyclonedx" | "spdx" | "csv";
+}, {
+    firmwareId: number;
+    format: "cyclonedx" | "spdx" | "csv";
+}>;
+/**
  * @summary Get full scan history
  */
 export declare const GetScanHistoryResponseItem: zod.ZodObject<{

@@ -4,6 +4,7 @@ import { db, aiReportsTable, scanResultsTable, firmwareTable, vulnerabilitiesTab
 import { eq, desc } from "drizzle-orm";
 import { generateTextReport } from "../services/pdf.js";
 import { generateAiReport } from "../services/ollama.js";
+import { generateSbomReport, getSbomReport } from "../services/sbom-generator.js";
 
 const router: IRouter = Router();
 
@@ -84,6 +85,57 @@ router.get("/reports/ai-summary/:firmwareId", async (req, res): Promise<void> =>
     generatedAt: report.generatedAt.toISOString(),
     exploitProbability: report.exploitProbability ?? null,
   });
+});
+
+router.get("/reports/sbom/:firmwareId", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.firmwareId) ? req.params.firmwareId[0] : req.params.firmwareId;
+  const firmwareId = parseInt(raw, 10);
+  if (isNaN(firmwareId)) { res.status(400).json({ error: "Invalid firmwareId" }); return; }
+
+  const [fw] = await db.select().from(firmwareTable).where(eq(firmwareTable.id, firmwareId));
+  if (!fw?.extractPath) { res.status(404).json({ error: "Firmware extraction path not available" }); return; }
+
+  let sbom = await getSbomReport(firmwareId);
+  if (!sbom) {
+    await generateSbomReport(firmwareId, fw.extractPath);
+    sbom = await getSbomReport(firmwareId);
+  }
+
+  if (!sbom) {
+    res.status(500).json({ error: "Unable to generate SBOM" });
+    return;
+  }
+
+  res.json({
+    firmwareId,
+    generatedAt: sbom.report.generatedAt.toISOString(),
+    componentCount: sbom.report.componentCount,
+    downloadUrls: {
+      cyclonedx: `/api/reports/sbom/${firmwareId}/download/cyclonedx`,
+      spdx: `/api/reports/sbom/${firmwareId}/download/spdx`,
+      csv: `/api/reports/sbom/${firmwareId}/download/csv`,
+    },
+    components: sbom.components,
+  });
+});
+
+router.get("/reports/sbom/:firmwareId/download/:format", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.firmwareId) ? req.params.firmwareId[0] : req.params.firmwareId;
+  const firmwareId = parseInt(raw, 10);
+  const format = req.params.format;
+  if (isNaN(firmwareId)) { res.status(400).json({ error: "Invalid firmwareId" }); return; }
+  if (!["cyclonedx", "spdx", "csv"].includes(format)) { res.status(400).json({ error: "Unsupported format" }); return; }
+
+  const sbom = await getSbomReport(firmwareId);
+  if (!sbom) { res.status(404).json({ error: "SBOM report not found" }); return; }
+
+  const filePath = format === "cyclonedx" ? sbom.report.cyclonedxPath : format === "spdx" ? sbom.report.spdxPath : sbom.report.csvPath;
+  const types = { cyclonedx: "application/json", spdx: "application/json", csv: "text/csv" } as const;
+  const names = { cyclonedx: "cyclonedx", spdx: "spdx", csv: "sbom" } as const;
+
+  res.setHeader("Content-Type", types[format]);
+  res.setHeader("Content-Disposition", `attachment; filename="firmware-${firmwareId}-${names[format]}.${format === "csv" ? "csv" : "json"}"`);
+  createReadStream(filePath).pipe(res);
 });
 
 router.get("/reports/history", async (_req, res): Promise<void> => {

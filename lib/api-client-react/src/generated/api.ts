@@ -41,6 +41,7 @@ import type {
   OpenPortList,
   ReportMeta,
   RiskDistribution,
+  SbomReport,
   ScanHistoryEntry,
   ScanResult,
   ScanStartInput,
@@ -2008,6 +2009,165 @@ export function useGetAiSummary<TData = Awaited<ReturnType<typeof getAiSummary>>
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetAiSummaryQueryOptions(firmwareId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetSbomReportUrl = (firmwareId: number,) => {
+
+
+
+
+  return `/api/reports/sbom/${firmwareId}`
+}
+
+/**
+ * @summary Get SBOM metadata and component list for a firmware scan
+ */
+export const getSbomReport = async (firmwareId: number, options?: RequestInit): Promise<SbomReport> => {
+
+  return customFetch<SbomReport>(getGetSbomReportUrl(firmwareId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSbomReportQueryKey = (firmwareId: number,) => {
+    return [
+    `/api/reports/sbom/${firmwareId}`
+    ] as const;
+    }
+
+
+export const getGetSbomReportQueryOptions = <TData = Awaited<ReturnType<typeof getSbomReport>>, TError = ErrorType<unknown>>(firmwareId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSbomReport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSbomReportQueryKey(firmwareId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSbomReport>>> = ({ signal }) => getSbomReport(firmwareId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(firmwareId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSbomReport>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSbomReportQueryResult = NonNullable<Awaited<ReturnType<typeof getSbomReport>>>
+export type GetSbomReportQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get SBOM metadata and component list for a firmware scan
+ */
+
+export function useGetSbomReport<TData = Awaited<ReturnType<typeof getSbomReport>>, TError = ErrorType<unknown>>(
+ firmwareId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSbomReport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSbomReportQueryOptions(firmwareId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetSbomDownloadUrl = (firmwareId: number,
+    format: 'cyclonedx' | 'spdx' | 'csv',) => {
+
+
+
+
+  return `/api/reports/sbom/${firmwareId}/download/${format}`
+}
+
+/**
+ * @summary Download SBOM file in the requested format
+ */
+export const getSbomDownload = async (firmwareId: number,
+    format: 'cyclonedx' | 'spdx' | 'csv', options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetSbomDownloadUrl(firmwareId,format),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSbomDownloadQueryKey = (firmwareId: number,
+    format: 'cyclonedx' | 'spdx' | 'csv',) => {
+    return [
+    `/api/reports/sbom/${firmwareId}/download/${format}`
+    ] as const;
+    }
+
+
+export const getGetSbomDownloadQueryOptions = <TData = Awaited<ReturnType<typeof getSbomDownload>>, TError = ErrorType<unknown>>(firmwareId: number,
+    format: 'cyclonedx' | 'spdx' | 'csv', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSbomDownload>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSbomDownloadQueryKey(firmwareId,format);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSbomDownload>>> = ({ signal }) => getSbomDownload(firmwareId,format, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(firmwareId && format), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSbomDownload>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSbomDownloadQueryResult = NonNullable<Awaited<ReturnType<typeof getSbomDownload>>>
+export type GetSbomDownloadQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Download SBOM file in the requested format
+ */
+
+export function useGetSbomDownload<TData = Awaited<ReturnType<typeof getSbomDownload>>, TError = ErrorType<unknown>>(
+ firmwareId: number,
+    format: 'cyclonedx' | 'spdx' | 'csv', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSbomDownload>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSbomDownloadQueryOptions(firmwareId,format,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

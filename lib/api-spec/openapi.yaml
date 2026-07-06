@@ -531,6 +531,51 @@ paths:
               schema:
                 $ref: "#/components/schemas/AiReport"
 
+  /reports/sbom/{firmwareId}:
+    get:
+      operationId: getSbomReport
+      tags: [reports]
+      summary: Get SBOM metadata and component list for a firmware scan
+      parameters:
+        - name: firmwareId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: SBOM metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SbomReport"
+
+  /reports/sbom/{firmwareId}/download/{format}:
+    get:
+      operationId: getSbomDownload
+      tags: [reports]
+      summary: Download SBOM file in the requested format
+      parameters:
+        - name: firmwareId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: format
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [cyclonedx, spdx, csv]
+      responses:
+        "200":
+          description: SBOM file download
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+
   /reports/history:
     get:
       operationId: getScanHistory
@@ -1065,6 +1110,46 @@ components:
           type: string
         exploitProbability:
           type: ["number", "null"]
+
+    SbomComponent:
+      type: object
+      required: [name, version, type, path, source]
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        type:
+          type: string
+        path:
+          type: string
+        source:
+          type: string
+
+    SbomReport:
+      type: object
+      required: [firmwareId, generatedAt, componentCount, downloadUrls, components]
+      properties:
+        firmwareId:
+          type: integer
+        generatedAt:
+          type: string
+        componentCount:
+          type: integer
+        downloadUrls:
+          type: object
+          required: [cyclonedx, spdx, csv]
+          properties:
+            cyclonedx:
+              type: string
+            spdx:
+              type: string
+            csv:
+              type: string
+        components:
+          type: array
+          items:
+            $ref: "#/components/schemas/SbomComponent"
 
     ScanHistoryEntry:
       type: object

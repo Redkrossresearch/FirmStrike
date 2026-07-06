@@ -447,6 +447,41 @@ export const GetAiSummaryResponse = zod.object({
 
 
 /**
+ * @summary Get SBOM metadata and component list for a firmware scan
+ */
+export const GetSbomReportParams = zod.object({
+  "firmwareId": zod.coerce.number()
+})
+
+export const GetSbomReportResponse = zod.object({
+  "firmwareId": zod.number(),
+  "generatedAt": zod.string(),
+  "componentCount": zod.number(),
+  "downloadUrls": zod.object({
+  "cyclonedx": zod.string(),
+  "spdx": zod.string(),
+  "csv": zod.string()
+}),
+  "components": zod.array(zod.object({
+  "name": zod.string(),
+  "version": zod.string(),
+  "type": zod.string(),
+  "path": zod.string(),
+  "source": zod.string()
+}))
+})
+
+
+/**
+ * @summary Download SBOM file in the requested format
+ */
+export const GetSbomDownloadParams = zod.object({
+  "firmwareId": zod.coerce.number(),
+  "format": zod.enum(['cyclonedx', 'spdx', 'csv'])
+})
+
+
+/**
  * @summary Get full scan history
  */
 export const GetScanHistoryResponseItem = zod.object({
