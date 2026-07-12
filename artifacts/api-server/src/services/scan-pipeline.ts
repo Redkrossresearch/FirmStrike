@@ -7,7 +7,7 @@ import { analyzeStaticFiles } from "./static-analyzer.js";
 import { matchCvesForComponents } from "./cve.js";
 import { scanExtractedBinaries } from "./malware-analyzer.js";
 import { runEmulation } from "./emulation.js";
-import { generateAiReport } from "./ollama.js";
+import { generateAiReport } from "./gemini.js";
 import { generateSbomReport } from "./sbom-generator.js";
 
 function computeRiskLevel(

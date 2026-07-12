@@ -21,7 +21,7 @@ export async function generateTextReport(firmwareId: number): Promise<{ path: st
     `Vulnerabilities Found: ${vulns.length}`,
     "",
     "-".repeat(60),
-    "EXECUTIVE SUMMARY (AI — Ollama qwen3:8b)",
+    "EXECUTIVE SUMMARY (AI — Google Gemini 2.5 Flash)",
     "-".repeat(60),
     report?.summary ?? "No AI summary available.",
     "",
