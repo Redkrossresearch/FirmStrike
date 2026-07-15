@@ -3,7 +3,7 @@ import { createReadStream } from "node:fs";
 import { db, aiReportsTable, scanResultsTable, firmwareTable, vulnerabilitiesTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { generateTextReport } from "../services/pdf.js";
-import { generateAiReport } from "../services/ollama.js";
+import { generateAiReport } from "../services/gemini.js";
 import { generateSbomReport, getSbomReport } from "../services/sbom-generator.js";
 
 const router: IRouter = Router();
