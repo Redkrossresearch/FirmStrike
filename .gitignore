@@ -1,3 +1,4 @@
 node_modules
 .env
 out.pdf
+artifacts/api-server.env
