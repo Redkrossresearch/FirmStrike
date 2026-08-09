@@ -1,6 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { mkdir } from "node:fs/promises";
+import { copyFile, mkdir, rename, unlink } from "node:fs/promises";
 
 const artifactDir = path.dirname(fileURLToPath(import.meta.url));
 export const workspaceRoot = path.resolve(artifactDir, "../../../..");
@@ -26,4 +26,18 @@ export function firmwareExtractPath(id: number): string {
 
 export function reportPath(firmwareId: number): string {
   return path.join(reportsDir, `firmware-${firmwareId}-report.txt`);
+}
+
+/** Move an uploaded temp file into place (handles cross-device EXDEV). */
+export async function moveUploadedFile(src: string, dest: string): Promise<void> {
+  try {
+    await rename(src, dest);
+  } catch (err) {
+    const code = err && typeof err === "object" && "code" in err ? String(err.code) : "";
+    if (code !== "EXDEV") {
+      throw err;
+    }
+    await copyFile(src, dest);
+    await unlink(src);
+  }
 }

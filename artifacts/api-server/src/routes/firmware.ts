@@ -5,10 +5,10 @@ import { unlink } from "node:fs/promises";
 import multer from "multer";
 import { db, firmwareTable, activityTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { ensureDataDirs, firmwareUploadPath } from "../lib/paths.js";
+import { ensureDataDirs, firmwareUploadPath, moveUploadedFile, uploadsDir } from "../lib/paths.js";
 
 const router: IRouter = Router();
-const upload = multer({ dest: "/tmp/viv-uploads", limits: { fileSize: 500 * 1024 * 1024 } });
+const upload = multer({ dest: uploadsDir, limits: { fileSize: 500 * 1024 * 1024 } });
 
 function toFirmwareResponse(f: typeof firmwareTable.$inferSelect) {
   return {
@@ -56,50 +56,64 @@ router.post("/firmware", async (req, res): Promise<void> => {
   res.status(201).json(toFirmwareResponse(fw));
 });
 
-router.post("/firmware/upload", upload.single("file"), async (req, res): Promise<void> => {
-  if (!req.file) {
-    res.status(400).json({ error: "No firmware file provided" });
-    return;
-  }
+router.post(
+  "/firmware/upload",
+  async (_req, res, next) => {
+    try {
+      await ensureDataDirs();
+      next();
+    } catch (err) {
+      next(err);
+    }
+  },
+  upload.single("file"),
+  async (req, res): Promise<void> => {
+    if (!req.file) {
+      res.status(400).json({ error: "No firmware file provided" });
+      return;
+    }
 
-  await ensureDataDirs();
+    try {
+      const hash = createHash("sha256");
+      await new Promise<void>((resolve, reject) => {
+        createReadStream(req.file!.path)
+          .on("data", (chunk: Buffer) => hash.update(chunk))
+          .on("end", () => resolve())
+          .on("error", reject);
+      });
+      const hashValue = hash.digest("hex");
+      const originalName = req.file.originalname || `firmware_${Date.now()}.bin`;
 
-  const hash = createHash("sha256");
-  await new Promise<void>((resolve, reject) => {
-    createReadStream(req.file!.path)
-      .on("data", (chunk: Buffer) => hash.update(chunk))
-      .on("end", () => resolve())
-      .on("error", reject);
-  });
-  const hashValue = hash.digest("hex");
-  const originalName = req.file.originalname || `firmware_${Date.now()}.bin`;
+      const [fw] = await db.insert(firmwareTable).values({
+        name: originalName,
+        hashValue,
+        fileSize: req.file.size,
+        architecture: "UNKNOWN",
+        vendor: null,
+        version: null,
+        status: "pending",
+      }).returning();
 
-  const [fw] = await db.insert(firmwareTable).values({
-    name: originalName,
-    hashValue,
-    fileSize: req.file.size,
-    architecture: "UNKNOWN",
-    vendor: null,
-    version: null,
-    status: "pending",
-  }).returning();
+      const destPath = firmwareUploadPath(fw.id, originalName);
+      await moveUploadedFile(req.file.path, destPath);
 
-  const destPath = firmwareUploadPath(fw.id, originalName);
-  const { rename } = await import("node:fs/promises");
-  await rename(req.file.path, destPath);
+      await db.update(firmwareTable).set({ filePath: destPath }).where(eq(firmwareTable.id, fw.id));
 
-  await db.update(firmwareTable).set({ filePath: destPath }).where(eq(firmwareTable.id, fw.id));
+      await db.insert(activityTable).values({
+        type: "scan_started",
+        message: `Firmware "${originalName}" uploaded (${(req.file.size / 1024 / 1024).toFixed(1)} MB)`,
+        severity: "info",
+        firmwareId: fw.id,
+        firmwareName: originalName,
+      });
 
-  await db.insert(activityTable).values({
-    type: "scan_started",
-    message: `Firmware "${originalName}" uploaded (${(req.file.size / 1024 / 1024).toFixed(1)} MB)`,
-    severity: "info",
-    firmwareId: fw.id,
-    firmwareName: originalName,
-  });
-
-  res.status(201).json(toFirmwareResponse({ ...fw, filePath: destPath }));
-});
+      res.status(201).json(toFirmwareResponse({ ...fw, filePath: destPath }));
+    } catch (err) {
+      await unlink(req.file.path).catch(() => undefined);
+      throw err;
+    }
+  },
+);
 
 router.get("/firmware/:id", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;

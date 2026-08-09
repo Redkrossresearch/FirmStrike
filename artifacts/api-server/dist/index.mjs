@@ -28310,7 +28310,7 @@ var require_pino = __commonJS({
     function pinoBundlerAbsolutePath(p) {
       try {
         const path10 = __require("path");
-        const outputDir = "D:\\Desktop\\Firmstrike\\Firm\\FirmStrike\\artifacts\\api-server\\dist";
+        const outputDir = "/run/media/vivek/New Volume/Clg study/5th sem/FirmStrike/artifacts/api-server/dist";
         return path10.resolve(outputDir, p.replace(/^\.\//, ""));
       } catch (e) {
         const f = new Function("p", "return new URL(p, import.meta.url).pathname");
@@ -58680,7 +58680,7 @@ var init_drizzle_orm = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-zod@0.8.3_drizzle-o_388078da7d074fc4ad4cae0eacfc8b59/node_modules/drizzle-zod/index.mjs
+// ../../node_modules/.pnpm/drizzle-zod@0.8.3_drizzle-orm@0.45.2_@types+pg@8.20.0_pg@8.20.0__zod@3.25.76/node_modules/drizzle-zod/index.mjs
 function isColumnType(column, columnTypes) {
   return columnTypes.includes(column.columnType);
 }
@@ -58892,7 +58892,7 @@ function handleColumns(columns, refinements, conditions, factory) {
 }
 var CONSTANTS, literalSchema, jsonSchema, bufferSchema, insertConditions, createInsertSchema;
 var init_drizzle_zod = __esm({
-  "../../node_modules/.pnpm/drizzle-zod@0.8.3_drizzle-o_388078da7d074fc4ad4cae0eacfc8b59/node_modules/drizzle-zod/index.mjs"() {
+  "../../node_modules/.pnpm/drizzle-zod@0.8.3_drizzle-orm@0.45.2_@types+pg@8.20.0_pg@8.20.0__zod@3.25.76/node_modules/drizzle-zod/index.mjs"() {
     init_v4();
     init_drizzle_orm();
     CONSTANTS = {
@@ -59162,14 +59162,43 @@ var init_schema2 = __esm({
   }
 });
 
+// ../../lib/db/src/connection.ts
+function resolveDatabaseUrl(rawUrl) {
+  try {
+    const parsed = new URL(rawUrl);
+    const isDirectSupabase = parsed.hostname.startsWith("db.") && parsed.hostname.endsWith(".supabase.co");
+    if (!isDirectSupabase) {
+      return rawUrl;
+    }
+    const projectRef = parsed.hostname.slice("db.".length, -".supabase.co".length);
+    const region = process.env.SUPABASE_REGION ?? "ap-south-1";
+    const poolerPrefix = process.env.SUPABASE_POOLER_PREFIX ?? "aws-1";
+    parsed.username = `postgres.${projectRef}`;
+    parsed.hostname = `${poolerPrefix}-${region}.pooler.supabase.com`;
+    parsed.port = process.env.SUPABASE_POOLER_PORT ?? "5432";
+    return parsed.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+function databaseRequiresSsl(connectionString2) {
+  return connectionString2.includes("supabase.co") || connectionString2.includes("supabase.com") || process.env.DATABASE_SSL === "true";
+}
+var init_connection = __esm({
+  "../../lib/db/src/connection.ts"() {
+    "use strict";
+  }
+});
+
 // ../../lib/db/src/index.ts
-var Pool3, pool, db;
+var Pool3, connectionString, pool, db;
 var init_src2 = __esm({
   "../../lib/db/src/index.ts"() {
     "use strict";
     init_node_postgres();
     init_esm();
     init_schema2();
+    init_connection();
     init_schema2();
     ({ Pool: Pool3 } = esm_default);
     if (!process.env.DATABASE_URL) {
@@ -59177,7 +59206,11 @@ var init_src2 = __esm({
         "DATABASE_URL must be set. Did you forget to provision a database?"
       );
     }
-    pool = new Pool3({ connectionString: process.env.DATABASE_URL });
+    connectionString = resolveDatabaseUrl(process.env.DATABASE_URL);
+    pool = new Pool3({
+      connectionString,
+      ...databaseRequiresSsl(connectionString) ? { ssl: { rejectUnauthorized: false } } : {}
+    });
     db = drizzle(pool, { schema: schema_exports });
   }
 });
@@ -75195,7 +75228,7 @@ var require_multer = __commonJS({
 // src/lib/paths.ts
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { mkdir } from "node:fs/promises";
+import { copyFile, mkdir, rename, unlink } from "node:fs/promises";
 async function ensureDataDirs() {
   await mkdir(uploadsDir, { recursive: true });
   await mkdir(extractsDir, { recursive: true });
@@ -75210,6 +75243,18 @@ function firmwareExtractPath(id) {
 }
 function reportPath(firmwareId) {
   return path.join(reportsDir, `firmware-${firmwareId}-report.txt`);
+}
+async function moveUploadedFile(src, dest) {
+  try {
+    await rename(src, dest);
+  } catch (err) {
+    const code = err && typeof err === "object" && "code" in err ? String(err.code) : "";
+    if (code !== "EXDEV") {
+      throw err;
+    }
+    await copyFile(src, dest);
+    await unlink(src);
+  }
 }
 var artifactDir, workspaceRoot, dataRoot, uploadsDir, extractsDir, reportsDir;
 var init_paths = __esm({
@@ -75227,7 +75272,7 @@ var init_paths = __esm({
 // src/routes/firmware.ts
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { unlink } from "node:fs/promises";
+import { unlink as unlink2 } from "node:fs/promises";
 function toFirmwareResponse(f) {
   return {
     id: f.id,
@@ -75251,7 +75296,7 @@ var init_firmware3 = __esm({
     init_drizzle_orm();
     init_paths();
     router3 = (0, import_express3.Router)();
-    upload = (0, import_multer.default)({ dest: "/tmp/viv-uploads", limits: { fileSize: 500 * 1024 * 1024 } });
+    upload = (0, import_multer.default)({ dest: uploadsDir, limits: { fileSize: 500 * 1024 * 1024 } });
     router3.get("/firmware", async (_req, res) => {
       const all = await db.select().from(firmwareTable).orderBy(firmwareTable.uploadedAt);
       res.json(all.map(toFirmwareResponse));
@@ -75280,40 +75325,55 @@ var init_firmware3 = __esm({
       });
       res.status(201).json(toFirmwareResponse(fw));
     });
-    router3.post("/firmware/upload", upload.single("file"), async (req, res) => {
-      if (!req.file) {
-        res.status(400).json({ error: "No firmware file provided" });
-        return;
+    router3.post(
+      "/firmware/upload",
+      async (_req, res, next) => {
+        try {
+          await ensureDataDirs();
+          next();
+        } catch (err) {
+          next(err);
+        }
+      },
+      upload.single("file"),
+      async (req, res) => {
+        if (!req.file) {
+          res.status(400).json({ error: "No firmware file provided" });
+          return;
+        }
+        try {
+          const hash = createHash("sha256");
+          await new Promise((resolve, reject) => {
+            createReadStream(req.file.path).on("data", (chunk) => hash.update(chunk)).on("end", () => resolve()).on("error", reject);
+          });
+          const hashValue = hash.digest("hex");
+          const originalName = req.file.originalname || `firmware_${Date.now()}.bin`;
+          const [fw] = await db.insert(firmwareTable).values({
+            name: originalName,
+            hashValue,
+            fileSize: req.file.size,
+            architecture: "UNKNOWN",
+            vendor: null,
+            version: null,
+            status: "pending"
+          }).returning();
+          const destPath = firmwareUploadPath(fw.id, originalName);
+          await moveUploadedFile(req.file.path, destPath);
+          await db.update(firmwareTable).set({ filePath: destPath }).where(eq(firmwareTable.id, fw.id));
+          await db.insert(activityTable).values({
+            type: "scan_started",
+            message: `Firmware "${originalName}" uploaded (${(req.file.size / 1024 / 1024).toFixed(1)} MB)`,
+            severity: "info",
+            firmwareId: fw.id,
+            firmwareName: originalName
+          });
+          res.status(201).json(toFirmwareResponse({ ...fw, filePath: destPath }));
+        } catch (err) {
+          await unlink2(req.file.path).catch(() => void 0);
+          throw err;
+        }
       }
-      await ensureDataDirs();
-      const hash = createHash("sha256");
-      await new Promise((resolve, reject) => {
-        createReadStream(req.file.path).on("data", (chunk) => hash.update(chunk)).on("end", () => resolve()).on("error", reject);
-      });
-      const hashValue = hash.digest("hex");
-      const originalName = req.file.originalname || `firmware_${Date.now()}.bin`;
-      const [fw] = await db.insert(firmwareTable).values({
-        name: originalName,
-        hashValue,
-        fileSize: req.file.size,
-        architecture: "UNKNOWN",
-        vendor: null,
-        version: null,
-        status: "pending"
-      }).returning();
-      const destPath = firmwareUploadPath(fw.id, originalName);
-      const { rename } = await import("node:fs/promises");
-      await rename(req.file.path, destPath);
-      await db.update(firmwareTable).set({ filePath: destPath }).where(eq(firmwareTable.id, fw.id));
-      await db.insert(activityTable).values({
-        type: "scan_started",
-        message: `Firmware "${originalName}" uploaded (${(req.file.size / 1024 / 1024).toFixed(1)} MB)`,
-        severity: "info",
-        firmwareId: fw.id,
-        firmwareName: originalName
-      });
-      res.status(201).json(toFirmwareResponse({ ...fw, filePath: destPath }));
-    });
+    );
     router3.get("/firmware/:id", async (req, res) => {
       const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const id = parseInt(raw, 10);
@@ -75338,7 +75398,7 @@ var init_firmware3 = __esm({
       const [fw] = await db.select().from(firmwareTable).where(eq(firmwareTable.id, id));
       if (fw?.filePath) {
         try {
-          await unlink(fw.filePath);
+          await unlink2(fw.filePath);
         } catch {
         }
       }
@@ -75509,8 +75569,8 @@ async function extractFirmware(firmwarePath, extractPath) {
     }
   }
   const rawCopy = path2.join(extractPath, "firmware.bin");
-  const { copyFile, readFile: readFile4 } = await import("node:fs/promises");
-  await copyFile(firmwarePath, rawCopy);
+  const { copyFile: copyFile2, readFile: readFile4 } = await import("node:fs/promises");
+  await copyFile2(firmwarePath, rawCopy);
   await extractGzipChunks(firmwarePath, extractPath);
   let stringsOutput = "";
   if (await commandExists("strings")) {
@@ -77009,6 +77069,15 @@ var init_security2 = __esm({
 });
 
 // src/routes/cve.ts
+function parseFirmwareId(raw) {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  const firmwareId = parseInt(value, 10);
+  if (isNaN(firmwareId) || firmwareId <= 0) return null;
+  return firmwareId;
+}
+async function getMatchesForFirmware(firmwareId) {
+  return db.select().from(cveMatchesTable).where(eq(cveMatchesTable.firmwareId, firmwareId));
+}
 var import_express6, router6, cve_default;
 var init_cve2 = __esm({
   "src/routes/cve.ts"() {
@@ -77018,29 +77087,44 @@ var init_cve2 = __esm({
     init_drizzle_orm();
     router6 = (0, import_express6.Router)();
     router6.get("/cve/matches/:firmwareId", async (req, res) => {
-      const raw = Array.isArray(req.params.firmwareId) ? req.params.firmwareId[0] : req.params.firmwareId;
-      const firmwareId = parseInt(raw, 10);
-      if (isNaN(firmwareId)) {
-        res.status(400).json({ error: "Invalid firmwareId" });
-        return;
+      try {
+        const firmwareId = parseFirmwareId(req.params.firmwareId);
+        if (firmwareId === null) {
+          res.status(400).json({ error: "Invalid firmwareId" });
+          return;
+        }
+        const matches = await getMatchesForFirmware(firmwareId);
+        res.json(matches);
+      } catch (err) {
+        console.error("Error fetching CVE matches:", err);
+        res.status(500).json({ error: "Internal server error" });
       }
-      const matches = await db.select().from(cveMatchesTable).where(eq(cveMatchesTable.firmwareId, firmwareId));
-      res.json(matches);
     });
     router6.get("/cve/scores/:firmwareId", async (req, res) => {
-      const raw = Array.isArray(req.params.firmwareId) ? req.params.firmwareId[0] : req.params.firmwareId;
-      const firmwareId = parseInt(raw, 10);
-      if (isNaN(firmwareId)) {
-        res.status(400).json({ error: "Invalid firmwareId" });
-        return;
+      try {
+        const firmwareId = parseFirmwareId(req.params.firmwareId);
+        if (firmwareId === null) {
+          res.status(400).json({ error: "Invalid firmwareId" });
+          return;
+        }
+        const matches = await getMatchesForFirmware(firmwareId);
+        const critical = matches.filter((m) => m.severity === "critical").length;
+        const high = matches.filter((m) => m.severity === "high").length;
+        const medium = matches.filter((m) => m.severity === "medium").length;
+        const low = matches.filter((m) => m.severity === "low").length;
+        const avgScore = matches.length > 0 ? matches.reduce((sum, m) => sum + Number(m.cvssScore), 0) / matches.length : 0;
+        res.json({
+          firmwareId,
+          critical,
+          high,
+          medium,
+          low,
+          averageScore: Math.round(avgScore * 10) / 10
+        });
+      } catch (err) {
+        console.error("Error fetching CVE scores:", err);
+        res.status(500).json({ error: "Internal server error" });
       }
-      const matches = await db.select().from(cveMatchesTable).where(eq(cveMatchesTable.firmwareId, firmwareId));
-      const critical = matches.filter((m) => m.severity === "critical").length;
-      const high = matches.filter((m) => m.severity === "high").length;
-      const medium = matches.filter((m) => m.severity === "medium").length;
-      const low = matches.filter((m) => m.severity === "low").length;
-      const avgScore = matches.length > 0 ? matches.reduce((s, m) => s + m.cvssScore, 0) / matches.length : 0;
-      res.json({ firmwareId, critical, high, medium, low, averageScore: Math.round(avgScore * 10) / 10 });
     });
     cve_default = router6;
   }
@@ -77621,6 +77705,22 @@ var init_app = __esm({
     app.use(import_express12.default.json());
     app.use(import_express12.default.urlencoded({ extended: true }));
     app.use("/api", routes_default);
+    app.use((err, _req, res, _next) => {
+      const cause = err instanceof Error && "cause" in err ? err.cause : void 0;
+      const pgCode = cause && typeof cause === "object" && "code" in cause ? String(cause.code) : void 0;
+      logger.error({ err, pgCode }, "Unhandled API error");
+      if (pgCode === "42P01") {
+        res.status(503).json({
+          error: "Database schema is not initialized. Run: pnpm --filter @workspace/db run push"
+        });
+        return;
+      }
+      if (pgCode === "ENOTFOUND" || pgCode === "ENETUNREACH" || pgCode === "ECONNREFUSED") {
+        res.status(503).json({ error: "Database connection failed. Check DATABASE_URL and network access." });
+        return;
+      }
+      res.status(500).json({ error: "Internal server error" });
+    });
     app_default = app;
   }
 });
