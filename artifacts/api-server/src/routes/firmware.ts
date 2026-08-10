@@ -8,7 +8,8 @@ import { eq } from "drizzle-orm";
 import { ensureDataDirs, firmwareUploadPath } from "../lib/paths.js";
 
 const router: IRouter = Router();
-const upload = multer({ dest: "/tmp/viv-uploads", limits: { fileSize: 500 * 1024 * 1024 } });
+const MAX_FIRMWARE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB, with headroom for full-disk dd images
+const upload = multer({ dest: "/tmp/viv-uploads", limits: { fileSize: MAX_FIRMWARE_SIZE } });
 
 function toFirmwareResponse(f: typeof firmwareTable.$inferSelect) {
   return {
@@ -56,49 +57,77 @@ router.post("/firmware", async (req, res): Promise<void> => {
   res.status(201).json(toFirmwareResponse(fw));
 });
 
-router.post("/firmware/upload", upload.single("file"), async (req, res): Promise<void> => {
+function handleUploadMiddleware(req: Parameters<ReturnType<typeof upload.single>>[0], res: Parameters<ReturnType<typeof upload.single>>[1], next: Parameters<ReturnType<typeof upload.single>>[2]) {
+  upload.single("file")(req, res, (err: unknown) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        res.status(413).json({ error: "Firmware file exceeds the 2GB upload limit." });
+        return;
+      }
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    if (err) {
+      res.status(500).json({ error: "Upload failed while receiving the firmware file." });
+      return;
+    }
+    next();
+  });
+}
+
+router.post("/firmware/upload", handleUploadMiddleware, async (req, res): Promise<void> => {
   if (!req.file) {
     res.status(400).json({ error: "No firmware file provided" });
     return;
   }
 
-  await ensureDataDirs();
+  try {
+    await ensureDataDirs();
 
-  const hash = createHash("sha256");
-  await new Promise<void>((resolve, reject) => {
-    createReadStream(req.file!.path)
-      .on("data", (chunk: Buffer) => hash.update(chunk))
-      .on("end", () => resolve())
-      .on("error", reject);
-  });
-  const hashValue = hash.digest("hex");
-  const originalName = req.file.originalname || `firmware_${Date.now()}.bin`;
+    const hash = createHash("sha256");
+    await new Promise<void>((resolve, reject) => {
+      createReadStream(req.file!.path)
+        .on("data", (chunk: Buffer) => hash.update(chunk))
+        .on("end", () => resolve())
+        .on("error", reject);
+    });
+    const hashValue = hash.digest("hex");
+    const originalName = req.file.originalname || `firmware_${Date.now()}.bin`;
 
-  const [fw] = await db.insert(firmwareTable).values({
-    name: originalName,
-    hashValue,
-    fileSize: req.file.size,
-    architecture: "UNKNOWN",
-    vendor: null,
-    version: null,
-    status: "pending",
-  }).returning();
+    const [fw] = await db.insert(firmwareTable).values({
+      name: originalName,
+      hashValue,
+      fileSize: req.file.size,
+      architecture: "UNKNOWN",
+      vendor: null,
+      version: null,
+      status: "pending",
+    }).returning();
 
-  const destPath = firmwareUploadPath(fw.id, originalName);
-  const { rename } = await import("node:fs/promises");
-  await rename(req.file.path, destPath);
+    const destPath = firmwareUploadPath(fw.id, originalName);
+    const { rename } = await import("node:fs/promises");
+    await rename(req.file.path, destPath);
 
-  await db.update(firmwareTable).set({ filePath: destPath }).where(eq(firmwareTable.id, fw.id));
+    await db.update(firmwareTable).set({ filePath: destPath }).where(eq(firmwareTable.id, fw.id));
 
-  await db.insert(activityTable).values({
-    type: "scan_started",
-    message: `Firmware "${originalName}" uploaded (${(req.file.size / 1024 / 1024).toFixed(1)} MB)`,
-    severity: "info",
-    firmwareId: fw.id,
-    firmwareName: originalName,
-  });
+    await db.insert(activityTable).values({
+      type: "scan_started",
+      message: `Firmware "${originalName}" uploaded (${(req.file.size / 1024 / 1024).toFixed(1)} MB)`,
+      severity: "info",
+      firmwareId: fw.id,
+      firmwareName: originalName,
+    });
 
-  res.status(201).json(toFirmwareResponse({ ...fw, filePath: destPath }));
+    res.status(201).json(toFirmwareResponse({ ...fw, filePath: destPath }));
+  } catch (err) {
+    await unlink(req.file.path).catch(() => undefined);
+    const message = err instanceof Error ? err.message : "Unknown upload error";
+    if (message.includes("Failed query") || message.includes("relation") || message.includes("column")) {
+      res.status(503).json({ error: "Upload service is temporarily unavailable because the database schema is unavailable or out of date." });
+      return;
+    }
+    res.status(500).json({ error: "Upload failed while saving the firmware file." });
+  }
 });
 
 router.get("/firmware/:id", async (req, res): Promise<void> => {

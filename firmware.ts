@@ -8,7 +8,7 @@ import { eq } from "drizzle-orm";
 import { ensureDataDirs, firmwareUploadPath } from "../lib/paths.js";
 
 const router: IRouter = Router();
-const MAX_FIRMWARE_SIZE = 1 * 1024 * 1024 * 1024 * 1024;
+const MAX_FIRMWARE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB, with headroom for full-disk dd images
 const upload = multer({ dest: "/tmp/viv-uploads", limits: { fileSize: MAX_FIRMWARE_SIZE } });
 
 function toFirmwareResponse(f: typeof firmwareTable.$inferSelect) {
@@ -57,7 +57,25 @@ router.post("/firmware", async (req, res): Promise<void> => {
   res.status(201).json(toFirmwareResponse(fw));
 });
 
-router.post("/firmware/upload", upload.single("file"), async (req, res): Promise<void> => {
+function handleUploadMiddleware(req: Parameters<ReturnType<typeof upload.single>>[0], res: Parameters<ReturnType<typeof upload.single>>[1], next: Parameters<ReturnType<typeof upload.single>>[2]) {
+  upload.single("file")(req, res, (err: unknown) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        res.status(413).json({ error: "Firmware file exceeds the 2GB upload limit." });
+        return;
+      }
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    if (err) {
+      res.status(500).json({ error: "Upload failed while receiving the firmware file." });
+      return;
+    }
+    next();
+  });
+}
+
+router.post("/firmware/upload", handleUploadMiddleware, async (req, res): Promise<void> => {
   if (!req.file) {
     res.status(400).json({ error: "No firmware file provided" });
     return;

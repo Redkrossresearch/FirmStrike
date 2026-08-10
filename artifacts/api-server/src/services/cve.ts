@@ -88,22 +88,22 @@ export async function matchCvesForComponents(components: string[]): Promise<CveM
     if (comp.includes("log4j")) cveIds.add("CVE-2021-44228");
   }
 
-  const matches: CveMatch[] = [];
-  for (const cveId of [...cveIds].slice(0, 10)) {
-    const match = await fetchNvdCve(cveId);
-    if (match) matches.push(match);
-    else {
-      matches.push({
-        cveId,
-        severity: "high",
-        cvssScore: 7.5,
-        description: `Known vulnerability ${cveId} associated with detected component`,
-        affectedComponent: components.find((c) => c.toLowerCase().includes("openssl")) ?? "firmware component",
-        publishedDate: "2023-01-01",
-        patchAvailable: true,
-      });
-    }
-  }
+  const idsToFetch = [...cveIds].slice(0, 10);
+  const fetched = await Promise.all(idsToFetch.map((cveId) => fetchNvdCve(cveId)));
+
+  const matches: CveMatch[] = fetched.map((match, i) => {
+    const cveId = idsToFetch[i];
+    if (match) return match;
+    return {
+      cveId,
+      severity: "high",
+      cvssScore: 7.5,
+      description: `Known vulnerability ${cveId} associated with detected component`,
+      affectedComponent: components.find((c) => c.toLowerCase().includes("openssl")) ?? "firmware component",
+      publishedDate: "2023-01-01",
+      patchAvailable: true,
+    };
+  });
 
   return matches;
 }
